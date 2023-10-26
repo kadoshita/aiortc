@@ -292,6 +292,7 @@ class RTCPeerConnection(AsyncIOEventEmitter):
     def __init__(self, configuration: Optional[RTCConfiguration] = None) -> None:
         super().__init__()
         self.__certificates = [RTCCertificate.generateCertificate()]
+        self.__cipher_list: Optional[str] = None
         self.__cname = f"{uuid.uuid4()}"
         self.__configuration = configuration or RTCConfiguration()
         self.__dtlsTransports: Set[RTCDtlsTransport] = set()
@@ -390,6 +391,16 @@ class RTCPeerConnection(AsyncIOEventEmitter):
         When the state changes, the `"signalingstatechange"` event is fired.
         """
         return self.__signalingState
+
+    def setCipherList(self, cipher_list: str) -> None:
+        """
+        Set the cipher suite to be used with DTLS.
+
+        Default value is `"HIGH:!CAMELLIA:!aNULL"`.
+
+        :param cipher_list: The cipher suite described in OpenSSL's Cipher list format.
+        """
+        self.__cipher_list = cipher_list
 
     async def addIceCandidate(self, candidate: RTCIceCandidate) -> None:
         """
@@ -1055,7 +1066,7 @@ class RTCPeerConnection(AsyncIOEventEmitter):
         self.__iceTransports.add(iceTransport)
 
         # create DTLS transport
-        dtlsTransport = RTCDtlsTransport(iceTransport, self.__certificates)
+        dtlsTransport = RTCDtlsTransport(iceTransport, self.__certificates, self.__cipher_list)
         dtlsTransport.on("statechange", self.__updateConnectionState)
         self.__dtlsTransports.add(dtlsTransport)
 

@@ -170,6 +170,72 @@ class RTCDtlsTransportTest(TestCase):
         await session2.stop()
 
     @asynctest
+    async def test_set_cipher_list(self):
+        transport1, transport2 = dummy_ice_transport_pair()
+
+        certificate1 = RTCCertificate.generateCertificate()
+        session1 = RTCDtlsTransport(transport1, [certificate1], "ECDHE-ECDSA-CHACHA20-POLY1305")
+        receiver1 = DummyDataReceiver()
+        session1._register_data_receiver(receiver1)
+
+        certificate2 = RTCCertificate.generateCertificate()
+        session2 = RTCDtlsTransport(transport2, [certificate2], "ECDHE-ECDSA-CHACHA20-POLY1305")
+        receiver2 = DummyDataReceiver()
+        session2._register_data_receiver(receiver2)
+
+        await asyncio.gather(
+            session1.start(session2.getLocalParameters()),
+            session2.start(session1.getLocalParameters()),
+        )
+
+        # send encypted data
+        await session1._send_data(b"ping")
+        await asyncio.sleep(0.1)
+        self.assertEqual(receiver2.data, [b"ping"])
+
+        await session2._send_data(b"pong")
+        await asyncio.sleep(0.1)
+        self.assertEqual(receiver1.data, [b"pong"])
+
+        self.assertEqual(session1.ssl.get_cipher_name(), "ECDHE-ECDSA-CHACHA20-POLY1305")
+        self.assertEqual(session2.ssl.get_cipher_name(), "ECDHE-ECDSA-CHACHA20-POLY1305")
+
+        await session1.stop()
+        await session2.stop()
+
+    @asynctest
+    async def test_set_cipher_list_handshake_error(self):
+        transport1, transport2 = dummy_ice_transport_pair()
+
+        certificate1 = RTCCertificate.generateCertificate()
+        session1 = RTCDtlsTransport(transport1, [certificate1], "ECDHE-ECDSA-AES256-GCM-SHA384")
+        receiver1 = DummyDataReceiver()
+        session1._register_data_receiver(receiver1)
+
+        certificate2 = RTCCertificate.generateCertificate()
+        session2 = RTCDtlsTransport(transport2, [certificate2], "ECDHE-ECDSA-CHACHA20-POLY1305")
+        receiver2 = DummyDataReceiver()
+        session2._register_data_receiver(receiver2)
+
+        await asyncio.gather(
+            session1.start(session2.getLocalParameters()),
+            session2.start(session1.getLocalParameters()),
+        )
+
+        with self.assertRaises(ConnectionError):
+            # send encypted data
+            await session1._send_data(b"ping")
+
+    @asynctest
+    async def test_set_cipher_list_with_invalid_value(self):
+        transport = dummy_ice_transport_pair()
+
+        certificate = RTCCertificate.generateCertificate()
+
+        with self.assertRaises(SSL.Error):
+            RTCDtlsTransport(transport, [certificate], "invalid")
+
+    @asynctest
     async def test_rtp(self):
         transport1, transport2 = dummy_ice_transport_pair()
 

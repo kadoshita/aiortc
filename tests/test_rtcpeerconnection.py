@@ -572,6 +572,29 @@ class RTCPeerConnectionTest(TestCase):
         aioice.stun.RETRY_RTO = self.retry_rto
 
     @asynctest
+    async def test_setCipherList(self):
+        pc1 = RTCPeerConnection()
+        pc1.setCipherList("ECDHE-ECDSA-CHACHA20-POLY1305")
+        pc2 = RTCPeerConnection()
+        pc2.setCipherList("ECDHE-ECDSA-CHACHA20-POLY1305")
+        pc1.addTrack(AudioStreamTrack())
+
+        offer = await pc1.createOffer()
+        await pc1.setLocalDescription(offer)
+        await pc2.setRemoteDescription(offer)
+        answer = await pc2.createAnswer()
+        await pc2.setLocalDescription(answer)
+        await pc1.setRemoteDescription(answer)
+
+        await asyncio.sleep(2)
+
+        self.assertEqual(pc1.signalingState, "stable")
+        self.assertEqual(pc2.signalingState, "stable")
+
+        await pc1.close()
+        await pc2.close()
+
+    @asynctest
     async def test_addIceCandidate_no_sdpMid_or_sdpMLineIndex(self):
         pc = RTCPeerConnection()
         with self.assertRaises(ValueError) as cm:

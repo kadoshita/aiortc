@@ -145,14 +145,16 @@ class RTCCertificate:
             cert=crypto.X509.from_cryptography(cert),
         )
 
-    def _create_ssl_context(self) -> SSL.Context:
+    def _create_ssl_context(self, cipher_list: Type[str]) -> SSL.Context:
+        cipher_list_bytes = cipher_list.encode(encoding='utf-8')
+
         ctx = SSL.Context(SSL.DTLS_METHOD)
         ctx.set_verify(
             SSL.VERIFY_PEER | SSL.VERIFY_FAIL_IF_NO_PEER_CERT, lambda *args: 1
         )
         ctx.use_certificate(self._cert)
         ctx.use_privatekey(self._key)
-        ctx.set_cipher_list(b"HIGH:!CAMELLIA:!aNULL")
+        ctx.set_cipher_list(cipher_list_bytes)
         ctx.set_tlsext_use_srtp(b"SRTP_AES128_CM_SHA1_80")
 
         return ctx
@@ -278,13 +280,17 @@ class RTCDtlsTransport(AsyncIOEventEmitter):
     :param transport: An :class:`RTCIceTransport`.
     :param certificates: A list of :class:`RTCCertificate` (only one is allowed
         currently).
+    :param cipher_list: A list of cipher suites.
     """
 
     def __init__(
-        self, transport: RTCIceTransport, certificates: List[RTCCertificate]
+        self, transport: RTCIceTransport, certificates: List[RTCCertificate], cipher_list: Optional[Type[str]] = None
     ) -> None:
         assert len(certificates) == 1
         certificate = certificates[0]
+
+        if cipher_list is None:
+            cipher_list = "HIGH:!CAMELLIA:!aNULL"
 
         super().__init__()
         self.encrypted = False
@@ -308,7 +314,7 @@ class RTCDtlsTransport(AsyncIOEventEmitter):
         self._tx_srtp: Session = None
 
         # SSL init
-        self.ssl = SSL.Connection(certificate._create_ssl_context())
+        self.ssl = SSL.Connection(certificate._create_ssl_context(cipher_list))
 
         self.__local_certificate = certificate
 
